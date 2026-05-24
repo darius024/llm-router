@@ -8,6 +8,11 @@ dependencies = [
     "python-dotenv>=1.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -18,3 +23,11 @@ packages = ["src/llm_router"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Live tests hit the local Ollama server; skip them by default in CI.
+addopts = "-m 'not live'"
+markers = [
+    "live: tests that require a running Ollama instance",
+]
