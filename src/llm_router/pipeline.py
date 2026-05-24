@@ -6,10 +6,10 @@ import time
 from dataclasses import dataclass
 
 from . import draft as draft_mod
-from . import filter as filter_mod
 from . import openrouter
 from . import request_log
 from . import router as router_mod
+from . import triage as triage_mod
 
 
 @dataclass
@@ -29,28 +29,34 @@ def answer(
     large_models: dict[str, str],
     threshold: float,
 ) -> Answer:
-    """Filter, draft locally, then escalate to the category's large model."""
+    """Triage, draft locally, then escalate to the category's large model."""
     started = time.perf_counter()
 
-    verdict = filter_mod.classify(prompt, model=small_model)
-    if verdict.verdict in ("reject", "injection"):
-        label = "refused" if verdict.verdict == "reject" else "blocked (prompt injection)"
+    decision = triage_mod.triage(prompt, model=small_model)
+    if decision.verdict in ("reject", "injection"):
+        label = "refused" if decision.verdict == "reject" else "blocked (prompt injection)"
         result = Answer(
-            text=f"Request {label}: {verdict.reason}".strip().rstrip(":"),
-            route=verdict.verdict,
+            text=f"Request {label}: {decision.reason}".strip().rstrip(":"),
+            route=decision.verdict,
             confidence=0.0,
-            reason=verdict.reason,
+            category=decision.category,
+            reason=decision.reason,
         )
     else:
         drafted = draft_mod.draft(prompt, model=small_model)
         if drafted.confidence >= threshold and drafted.answer:
             result = Answer(
-                text=drafted.answer, route="small", confidence=drafted.confidence
+                text=drafted.answer,
+                route="small",
+                confidence=drafted.confidence,
+                category=decision.category,
             )
         else:
-            category = router_mod.classify(prompt, model=small_model)
             # Fall back to chat if the category has no configured slug.
-            chosen = large_models.get(category) or large_models[router_mod.DEFAULT_CATEGORY]
+            chosen = (
+                large_models.get(decision.category)
+                or large_models[router_mod.DEFAULT_CATEGORY]
+            )
             text = openrouter.chat(
                 [{"role": "user", "content": prompt}], model=chosen
             )
@@ -58,7 +64,7 @@ def answer(
                 text=text,
                 route="large",
                 confidence=drafted.confidence,
-                category=category,
+                category=decision.category,
                 large_model=chosen,
             )
 
