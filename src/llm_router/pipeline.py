@@ -1,10 +1,11 @@
-"""Decide between using the local draft or escalating to a large model."""
+"""Decide between cache, local draft, refusal, or escalation to a large model."""
 
 from __future__ import annotations
 
 import time
 from dataclasses import dataclass
 
+from . import cache
 from . import draft as draft_mod
 from . import openrouter
 from . import preprocess
@@ -16,7 +17,7 @@ from . import triage as triage_mod
 @dataclass
 class Answer:
     text: str
-    route: str  # "small", "large", "reject", or "injection"
+    route: str  # "small", "large", "cache", "reject", or "injection"
     verdict: str  # the triage verdict regardless of route
     confidence: float
     category: str | None = None
@@ -32,9 +33,18 @@ def answer(
     large_models: dict[str, str],
     threshold: float,
     condense_threshold_chars: int = 0,
+    use_cache: bool = True,
 ) -> Answer:
     """Triage, draft locally, then escalate to the category's large model."""
     started = time.perf_counter()
+
+    if use_cache:
+        cached = cache.get(prompt)
+        if cached is not None:
+            result = Answer(**cached)
+            result.route = "cache"
+            _log(prompt, result, small_model, started)
+            return result
 
     decision = triage_mod.triage(prompt, model=small_model)
     if decision.verdict in ("reject", "injection"):
@@ -83,6 +93,15 @@ def answer(
                 prompt_chars=len(forwarded),
             )
 
+    _log(prompt, result, small_model, started)
+    # Only cache outcomes that produced a real answer; refusals stay live
+    # so a future change to the small model's policy is not papered over.
+    if use_cache and result.route in ("small", "large"):
+        cache.put(prompt, _to_cache_payload(result))
+    return result
+
+
+def _log(prompt: str, result: Answer, small_model: str, started: float) -> None:
     request_log.log(
         {
             "prompt": prompt,
@@ -99,4 +118,16 @@ def answer(
             "latency_s": round(time.perf_counter() - started, 3),
         }
     )
-    return result
+
+
+def _to_cache_payload(result: Answer) -> dict:
+    return {
+        "text": result.text,
+        "route": result.route,
+        "verdict": result.verdict,
+        "confidence": result.confidence,
+        "category": result.category,
+        "large_model": result.large_model,
+        "reason": result.reason,
+        "prompt_chars": result.prompt_chars,
+    }
