@@ -11,13 +11,14 @@ from . import openrouter
 from . import preprocess
 from . import request_log
 from . import router as router_mod
+from . import semantic_cache
 from . import triage as triage_mod
 
 
 @dataclass
 class Answer:
     text: str
-    route: str  # "small", "large", "cache", "reject", or "injection"
+    route: str  # "small", "large", "cache", "semantic_cache", "reject", or "injection"
     verdict: str  # the triage verdict regardless of route
     confidence: float
     category: str | None = None
@@ -34,6 +35,7 @@ def answer(
     threshold: float,
     condense_threshold_chars: int = 0,
     use_cache: bool = True,
+    use_semantic_cache: bool = False,
 ) -> Answer:
     """Triage, draft locally, then escalate to the category's large model."""
     started = time.perf_counter()
@@ -43,6 +45,17 @@ def answer(
         if cached is not None:
             result = Answer(**cached)
             result.route = "cache"
+            _log(prompt, result, small_model, started)
+            return result
+
+    if use_semantic_cache:
+        try:
+            similar = semantic_cache.get(prompt, model=small_model)
+        except Exception:
+            similar = None  # never let cache lookup break a live request
+        if similar is not None:
+            result = Answer(**similar)
+            result.route = "semantic_cache"
             _log(prompt, result, small_model, started)
             return result
 
@@ -96,8 +109,15 @@ def answer(
     _log(prompt, result, small_model, started)
     # Only cache outcomes that produced a real answer; refusals stay live
     # so a future change to the small model's policy is not papered over.
-    if use_cache and result.route in ("small", "large"):
-        cache.put(prompt, _to_cache_payload(result))
+    if result.route in ("small", "large"):
+        payload = _to_cache_payload(result)
+        if use_cache:
+            cache.put(prompt, payload)
+        if use_semantic_cache:
+            try:
+                semantic_cache.put(prompt, payload, model=small_model)
+            except Exception:
+                pass
     return result
 
 

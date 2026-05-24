@@ -35,6 +35,7 @@ def main(argv: list[str] | None = None) -> int:
         large_models=_large_models(),
         threshold=float(os.environ.get("CONFIDENCE_THRESHOLD", "0.7")),
         condense_threshold_chars=int(os.environ.get("CONDENSE_THRESHOLD_CHARS", "0")),
+        use_semantic_cache=os.environ.get("SEMANTIC_CACHE", "0") == "1",
     )
     print(
         f"[route={result.route} confidence={result.confidence:.2f}"
