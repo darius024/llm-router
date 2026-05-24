@@ -19,8 +19,9 @@ def main(argv: list[str] | None = None) -> int:
 
     prompt = " ".join(args)
     small_model = os.environ.get("SMALL_MODEL", "llama3.1:8b")
-    reply = draft.draft(prompt, model=small_model)
-    print(reply)
+    result = draft.draft(prompt, model=small_model)
+    print(f"[small confidence={result.confidence:.2f}]", file=sys.stderr)
+    print(result.answer)
     return 0
 
 
