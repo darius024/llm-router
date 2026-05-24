@@ -16,6 +16,7 @@ from . import triage as triage_mod
 class Answer:
     text: str
     route: str  # "small", "large", "reject", or "injection"
+    verdict: str  # the triage verdict regardless of route
     confidence: float
     category: str | None = None
     large_model: str | None = None
@@ -38,6 +39,7 @@ def answer(
         result = Answer(
             text=f"Request {label}: {decision.reason}".strip().rstrip(":"),
             route=decision.verdict,
+            verdict=decision.verdict,
             confidence=0.0,
             category=decision.category,
             reason=decision.reason,
@@ -48,6 +50,7 @@ def answer(
             result = Answer(
                 text=drafted.answer,
                 route="small",
+                verdict=decision.verdict,
                 confidence=drafted.confidence,
                 category=decision.category,
             )
@@ -63,6 +66,7 @@ def answer(
             result = Answer(
                 text=text,
                 route="large",
+                verdict=decision.verdict,
                 confidence=drafted.confidence,
                 category=decision.category,
                 large_model=chosen,
@@ -71,7 +75,9 @@ def answer(
     request_log.log(
         {
             "prompt": prompt,
+            "verdict": result.verdict,
             "route": result.route,
+            "escalated": result.route == "large",
             "confidence": result.confidence,
             "category": result.category,
             "small_model": small_model,
