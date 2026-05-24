@@ -31,10 +31,11 @@ def answer(
     started = time.perf_counter()
 
     verdict = filter_mod.classify(prompt, model=small_model)
-    if verdict.verdict == "reject":
+    if verdict.verdict in ("reject", "injection"):
+        label = "refused" if verdict.verdict == "reject" else "blocked (prompt injection)"
         result = Answer(
-            text=f"Request refused: {verdict.reason}".strip().rstrip(":"),
-            route="reject",
+            text=f"Request {label}: {verdict.reason}".strip().rstrip(":"),
+            route=verdict.verdict,
             confidence=0.0,
             reason=verdict.reason,
         )
