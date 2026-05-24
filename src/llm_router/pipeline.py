@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from typing import Callable
 
 from . import cache
 from . import draft as draft_mod
@@ -36,6 +37,7 @@ def answer(
     condense_threshold_chars: int = 0,
     use_cache: bool = True,
     use_semantic_cache: bool = False,
+    on_large_chunk: Callable[[str], None] | None = None,
 ) -> Answer:
     """Triage, draft locally, then escalate to the category's large model."""
     started = time.perf_counter()
@@ -93,9 +95,18 @@ def answer(
                 forwarded = preprocess.structure_code_request(
                     forwarded, model=small_model
                 )
-            text = openrouter.chat(
-                [{"role": "user", "content": forwarded}], model=chosen
-            )
+            if on_large_chunk is not None:
+                chunks: list[str] = []
+                for chunk in openrouter.stream(
+                    [{"role": "user", "content": forwarded}], model=chosen
+                ):
+                    chunks.append(chunk)
+                    on_large_chunk(chunk)
+                text = "".join(chunks)
+            else:
+                text = openrouter.chat(
+                    [{"role": "user", "content": forwarded}], model=chosen
+                )
             result = Answer(
                 text=text,
                 route="large",
@@ -151,3 +162,35 @@ def _to_cache_payload(result: Answer) -> dict:
         "reason": result.reason,
         "prompt_chars": result.prompt_chars,
     }
+
+
+def answer_stream(
+    prompt: str,
+    *,
+    small_model: str,
+    large_models: dict[str, str],
+    threshold: float,
+    condense_threshold_chars: int = 0,
+    use_cache: bool = True,
+    use_semantic_cache: bool = False,
+    on_chunk: Callable[[str], None] | None = None,
+) -> Answer:
+    """Like answer() but streams large-model output to `on_chunk` as it arrives.
+
+    Cache hits, small-model drafts and refusals are emitted as a single chunk
+    since they are already computed. The final Answer is returned once the
+    stream completes so callers can still inspect routing metadata.
+    """
+    result = answer(
+        prompt,
+        small_model=small_model,
+        large_models=large_models,
+        threshold=threshold,
+        condense_threshold_chars=condense_threshold_chars,
+        use_cache=use_cache,
+        use_semantic_cache=use_semantic_cache,
+        on_large_chunk=on_chunk,
+    )
+    if result.route != "large" and on_chunk is not None:
+        on_chunk(result.text)
+    return result
