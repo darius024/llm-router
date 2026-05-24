@@ -34,6 +34,7 @@ def main(argv: list[str] | None = None) -> int:
         small_model=os.environ.get("SMALL_MODEL", "llama3.1:8b"),
         large_models=_large_models(),
         threshold=float(os.environ.get("CONFIDENCE_THRESHOLD", "0.7")),
+        condense_threshold_chars=int(os.environ.get("CONDENSE_THRESHOLD_CHARS", "0")),
     )
     print(
         f"[route={result.route} confidence={result.confidence:.2f}"
