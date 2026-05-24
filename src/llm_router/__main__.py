@@ -1,4 +1,4 @@
-"""CLI entrypoint: forward a single prompt to the large model."""
+"""CLI entrypoint: route a prompt through the cascade."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import sys
 
 from dotenv import load_dotenv
 
-from . import draft
+from . import pipeline
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -18,10 +18,19 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     prompt = " ".join(args)
-    small_model = os.environ.get("SMALL_MODEL", "llama3.1:8b")
-    result = draft.draft(prompt, model=small_model)
-    print(f"[small confidence={result.confidence:.2f}]", file=sys.stderr)
-    print(result.answer)
+    result = pipeline.answer(
+        prompt,
+        small_model=os.environ.get("SMALL_MODEL", "llama3.1:8b"),
+        large_model=os.environ.get("LARGE_MODEL", "anthropic/claude-sonnet-4.5"),
+        threshold=float(os.environ.get("CONFIDENCE_THRESHOLD", "0.7")),
+    )
+    print(
+        f"[route={result.route} confidence={result.confidence:.2f}"
+        + (f" model={result.large_model}" if result.large_model else "")
+        + "]",
+        file=sys.stderr,
+    )
+    print(result.text)
     return 0
 
 
