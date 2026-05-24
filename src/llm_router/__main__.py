@@ -10,6 +10,17 @@ from dotenv import load_dotenv
 from . import pipeline
 
 
+def _large_models() -> dict[str, str]:
+    """Read the per-category large-model slugs from the environment."""
+    default = "anthropic/claude-sonnet-4.5"
+    return {
+        "reasoning": os.environ.get("LARGE_MODEL_REASONING", default),
+        "chat": os.environ.get("LARGE_MODEL_CHAT", default),
+        "fast": os.environ.get("LARGE_MODEL_FAST", default),
+        "code": os.environ.get("LARGE_MODEL_CODE", default),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     load_dotenv()
     args = argv if argv is not None else sys.argv[1:]
@@ -21,11 +32,12 @@ def main(argv: list[str] | None = None) -> int:
     result = pipeline.answer(
         prompt,
         small_model=os.environ.get("SMALL_MODEL", "llama3.1:8b"),
-        large_model=os.environ.get("LARGE_MODEL", "anthropic/claude-sonnet-4.5"),
+        large_models=_large_models(),
         threshold=float(os.environ.get("CONFIDENCE_THRESHOLD", "0.7")),
     )
     print(
         f"[route={result.route} confidence={result.confidence:.2f}"
+        + (f" category={result.category}" if result.category else "")
         + (f" model={result.large_model}" if result.large_model else "")
         + (f" reason={result.reason!r}" if result.reason else "")
         + "]",

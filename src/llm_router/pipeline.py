@@ -9,13 +9,15 @@ from . import draft as draft_mod
 from . import filter as filter_mod
 from . import openrouter
 from . import request_log
+from . import router as router_mod
 
 
 @dataclass
 class Answer:
     text: str
-    route: str  # "small", "large", or "reject"
+    route: str  # "small", "large", "reject", or "injection"
     confidence: float
+    category: str | None = None
     large_model: str | None = None
     reason: str | None = None
 
@@ -24,10 +26,10 @@ def answer(
     prompt: str,
     *,
     small_model: str,
-    large_model: str,
+    large_models: dict[str, str],
     threshold: float,
 ) -> Answer:
-    """Filter, draft locally, then escalate to the large model when needed."""
+    """Filter, draft locally, then escalate to the category's large model."""
     started = time.perf_counter()
 
     verdict = filter_mod.classify(prompt, model=small_model)
@@ -46,14 +48,18 @@ def answer(
                 text=drafted.answer, route="small", confidence=drafted.confidence
             )
         else:
+            category = router_mod.classify(prompt, model=small_model)
+            # Fall back to chat if the category has no configured slug.
+            chosen = large_models.get(category) or large_models[router_mod.DEFAULT_CATEGORY]
             text = openrouter.chat(
-                [{"role": "user", "content": prompt}], model=large_model
+                [{"role": "user", "content": prompt}], model=chosen
             )
             result = Answer(
                 text=text,
                 route="large",
                 confidence=drafted.confidence,
-                large_model=large_model,
+                category=category,
+                large_model=chosen,
             )
 
     request_log.log(
@@ -61,6 +67,7 @@ def answer(
             "prompt": prompt,
             "route": result.route,
             "confidence": result.confidence,
+            "category": result.category,
             "small_model": small_model,
             "large_model": result.large_model,
             "reason": result.reason,
