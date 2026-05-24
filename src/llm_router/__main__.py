@@ -27,6 +27,7 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"[route={result.route} confidence={result.confidence:.2f}"
         + (f" model={result.large_model}" if result.large_model else "")
+        + (f" reason={result.reason!r}" if result.reason else "")
         + "]",
         file=sys.stderr,
     )
