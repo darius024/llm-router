@@ -25,3 +25,4 @@ node_modules/
 logs/
 data/
 .cache/
+reports/
