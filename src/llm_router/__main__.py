@@ -7,7 +7,7 @@ import sys
 
 from dotenv import load_dotenv
 
-from . import openrouter
+from . import draft
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -18,8 +18,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     prompt = " ".join(args)
-    model = os.environ.get("LARGE_MODEL", "anthropic/claude-sonnet-4.5")
-    reply = openrouter.chat([{"role": "user", "content": prompt}], model=model)
+    small_model = os.environ.get("SMALL_MODEL", "llama3.1:8b")
+    reply = draft.draft(prompt, model=small_model)
     print(reply)
     return 0
 
