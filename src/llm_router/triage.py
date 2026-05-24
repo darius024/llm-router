@@ -62,6 +62,13 @@ def _parse(raw: str) -> Triage:
     start = raw.find("{")
     end = raw.rfind("}")
     if start == -1 or end == -1:
+        # The model refused to even classify — treat that as reject, not safe.
+        if filter_mod._REFUSAL_PATTERNS.search(raw):
+            return Triage(
+                verdict="reject",
+                category=router_mod.DEFAULT_CATEGORY,
+                reason="classifier refused to engage",
+            )
         return Triage(verdict="safe", category=router_mod.DEFAULT_CATEGORY, reason="")
     try:
         data = json.loads(raw[start : end + 1])

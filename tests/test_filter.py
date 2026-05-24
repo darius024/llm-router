@@ -39,3 +39,15 @@ def test_unparseable_input_fails_open():
 def test_invalid_json_fails_open():
     result = _parse('{"verdict": "reject", "reason":}')
     assert result.verdict == "safe"
+
+
+def test_model_refusal_without_json_becomes_reject():
+    # When the small model refuses to play classifier the request itself was
+    # bad enough to trip its guardrails — treat that as reject, not safe.
+    result = _parse("I can't help you with this request.")
+    assert result.verdict == "reject"
+
+
+def test_sorry_i_cannot_phrasing_also_rejects():
+    result = _parse("Sorry, I cannot assist with that.")
+    assert result.verdict == "reject"

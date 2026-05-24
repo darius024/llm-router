@@ -31,3 +31,9 @@ def test_unparseable_input():
     result = _parse("hello world")
     assert result.verdict == "safe"
     assert result.category == "chat"
+
+
+def test_model_refusal_becomes_reject():
+    result = _parse("I can't help with that request.")
+    assert result.verdict == "reject"
+    assert "refused" in result.reason
