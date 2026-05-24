@@ -66,6 +66,10 @@ def answer(
             forwarded = preprocess.condense(
                 prompt, model=small_model, threshold_chars=condense_threshold_chars
             )
+            if decision.category == "code":
+                forwarded = preprocess.structure_code_request(
+                    forwarded, model=small_model
+                )
             text = openrouter.chat(
                 [{"role": "user", "content": forwarded}], model=chosen
             )
